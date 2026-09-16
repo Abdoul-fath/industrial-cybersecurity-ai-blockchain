@@ -1,0 +1,7 @@
+paho-mqtt
+influxdb-client
+cryptography
+pandas
+joblib
+scikit-learn
+requests

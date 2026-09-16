@@ -1,0 +1,314 @@
+version: "3.9"
+
+services:
+
+  # ==========================================================
+  # PI1 - NŒUD ÉMETTEUR
+  # ==========================================================
+
+  pi1:
+
+    build:
+      context: ./pi1
+
+    container_name: pi1
+
+    hostname: raspberrypi1
+
+    tty: true
+
+    stdin_open: true
+
+    working_dir: /workspace
+
+    volumes:
+      - ./pi1:/workspace
+
+    environment:
+
+      MQTT_BROKER: mqtt
+
+      MQTT_PORT: 1883
+
+      MQTT_TOPIC: factory/machine1
+
+    networks:
+      - industrial_net
+
+    depends_on:
+      - mqtt
+
+    restart: unless-stopped
+
+
+  # ==========================================================
+  # PI2 - EDGE IDS
+  # ==========================================================
+
+  pi2:
+
+    build:
+      context: ./pi2
+
+    container_name: pi2
+
+    hostname: raspberrypi2
+
+    tty: true
+
+    stdin_open: true
+
+    working_dir: /workspace
+
+    volumes:
+
+      - ./pi2:/workspace
+
+      - ./data:/data
+
+    environment:
+
+      MQTT_BROKER: mqtt
+
+      MQTT_PORT: 1883
+
+      MQTT_TOPIC: factory/machine1
+
+      BLOCKCHAIN_URL: http://blockchain:5000
+
+      BLOCKCHAIN_NODE_ID: raspberrypi1
+
+      INFLUX_URL: http://influxdb:8086
+
+      INFLUX_ORG: PFA
+
+      INFLUX_BUCKET: factory
+
+      INFLUX_TOKEN: ${INFLUX_TOKEN}
+
+      PUBLIC_KEY_FILE: /workspace/public_key.pem
+
+      MODEL_FILE: /workspace/isolation_forest.pkl
+
+      JOURNAL_FILE: /data/journal_recepteur.json
+
+    networks:
+      - industrial_net
+
+    depends_on:
+
+      - mqtt
+
+      - influxdb
+
+      - blockchain
+
+    restart: unless-stopped
+
+
+  # ==========================================================
+  # INTERFACE FLASK
+  # ==========================================================
+
+  interface:
+
+    build:
+      context: ./pi2
+
+    container_name: pi2-interface
+
+    hostname: pi2-interface
+
+    working_dir: /workspace
+
+    command:
+      [
+        "python3",
+        "interface_flask.py"
+      ]
+
+    volumes:
+
+      - ./pi2:/workspace
+
+      - ./data:/data
+
+    environment:
+
+      BLOCKCHAIN_URL: http://blockchain:5000
+
+      JOURNAL_FILE: /data/journal_recepteur.json
+
+      FLASK_PORT: 5001
+
+    ports:
+
+      - "5001:5001"
+
+    networks:
+      - industrial_net
+
+    depends_on:
+
+      - pi2
+
+      - blockchain
+
+    restart: unless-stopped
+
+
+  # ==========================================================
+  # BLOCKCHAIN
+  # ==========================================================
+
+  blockchain:
+
+    build:
+      context: ./blockchain
+
+    container_name: blockchain
+
+    hostname: blockchain
+
+    ports:
+
+      - "5000:5000"
+
+    volumes:
+
+      - ./blockchain/data:/data
+
+    networks:
+      - industrial_net
+
+    restart: unless-stopped
+
+
+  # ==========================================================
+  # ATTAQUANT
+  # ==========================================================
+
+  attacker:
+
+    build:
+      context: ./attacks
+
+    container_name: attacker
+
+    hostname: attacker
+
+    tty: true
+
+    stdin_open: true
+
+    working_dir: /workspace
+
+    volumes:
+
+      - ./attacks:/workspace
+
+    networks:
+      - industrial_net
+
+    depends_on:
+
+      - mqtt
+
+    restart: unless-stopped
+
+
+  # ==========================================================
+  # MQTT BROKER
+  # ==========================================================
+
+  mqtt:
+
+    image: eclipse-mosquitto:2
+
+    container_name: mqtt
+
+    hostname: mqtt
+
+    ports:
+
+      - "1883:1883"
+
+    volumes:
+
+      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf
+
+      - ./mosquitto/data:/mosquitto/data
+
+      - ./mosquitto/log:/mosquitto/log
+
+    networks:
+      - industrial_net
+
+    restart: unless-stopped
+
+
+  # ==========================================================
+  # INFLUXDB
+  # ==========================================================
+
+  influxdb:
+
+    image: influxdb:2
+
+    container_name: influxdb
+
+    hostname: influxdb
+
+    ports:
+
+      - "8086:8086"
+
+    volumes:
+
+      - ./influxdb:/var/lib/influxdb2
+
+    networks:
+      - industrial_net
+
+    restart: unless-stopped
+
+
+  # ==========================================================
+  # GRAFANA
+  # ==========================================================
+
+  grafana:
+
+    image: grafana/grafana:latest
+
+    container_name: grafana
+
+    hostname: grafana
+
+    ports:
+
+      - "3000:3000"
+
+    volumes:
+
+      - ./grafana:/var/lib/grafana
+
+    networks:
+      - industrial_net
+
+    depends_on:
+
+      - influxdb
+
+    restart: unless-stopped
+
+
+# ============================================================
+# RÉSEAU INDUSTRIEL
+# ============================================================
+
+networks:
+
+  industrial_net:
+
+    driver: bridge

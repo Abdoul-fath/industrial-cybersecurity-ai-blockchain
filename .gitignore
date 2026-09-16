@@ -1,0 +1,41 @@
+# Secrets
+.env
+private_key.pem
+*.key
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# Bases de données / fichiers générés
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs et fichiers runtime
+*.log
+*.jsonl
+sequence.txt
+last_signed_message.json
+
+# Fichiers de sauvegarde
+*_backup.py
+*_backup2.py
+*.tar.gz
+
+# Données locales générées
+blockchain/data/
+blockchain/data_backup/
+mosquitto/data/
+mosquitto/log/
+
+# IDE
+.vscode/
+.idea/
+
+# Système
+.DS_Store
+Thumbs.db
